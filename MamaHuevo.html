@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Huevo a Gallina con contador</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: #5db9ff; /* Fondo azul */
+    position: relative;
+    height: 100vh;
+    cursor: pointer;
+    font-family: sans-serif;
+  }
+  .emoji {
+    position: absolute;
+    font-size: 80px;
+    user-select: none;
+    will-change: transform;
+  }
+  #contador {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    font-size: 2rem;
+    font-weight: bold;
+    color: white;
+    background: rgba(0,0,0,0.4);
+    padding: 5px 10px;
+    border-radius: 5px;
+    user-select: none;
+    font-family: monospace;
+    z-index: 1000;
+  }
+  #mensajeFin {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 48px;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 20px 40px;
+    border-radius: 10px;
+    display: none;
+    z-index: 9999; /* Muy arriba para tapar todo */
+    pointer-events: none; /* No bloquea clicks */
+  }
+</style>
+</head>
+<body>
+
+<div id="contador">000</div>
+<div id="mensajeFin">Fin del juego</div>
+
+<script>
+  const estados = ['🥚', '🐣', '🐤', '🐔']; // huevo, pollito saliendo, pollito, gallina
+  const contadorEl = document.getElementById('contador');
+  const mensajeFin = document.getElementById('mensajeFin');
+  let contadorGallinas = 0;
+  let juegoTerminado = false;
+
+  class Emoji {
+    constructor(x, y, esInicial = false) {
+      this.element = document.createElement('div');
+      this.element.classList.add('emoji');
+      this.estado = 0; // empieza en huevo
+      this.element.textContent = estados[this.estado];
+      this.x = x;
+      this.y = y;
+      this.width = 80;
+      this.height = 80;
+      this.setVelocidad();
+      this.updatePosition();
+      this.esInicial = esInicial;
+
+      this.element.addEventListener('click', e => {
+        e.stopPropagation();
+        if (juegoTerminado) return;
+
+        if (this.estado === 3) { // gallina
+          contadorGallinas++;
+          contadorEl.textContent = String(contadorGallinas).padStart(3, '0');
+          crearEmojiRandom(false); // crea un nuevo huevo
+          return;
+        }
+
+        this.cambiarEstado();
+      });
+
+      document.body.appendChild(this.element);
+    }
+
+    setVelocidad() {
+      if (this.estado === 0) {
+        this.vx = 0;
+        this.vy = 0;
+      } else {
+        this.vx = (Math.random() * 4 + 1) * (Math.random() < 0.5 ? 1 : -1);
+        this.vy = (Math.random() * 4 + 1) * (Math.random() < 0.5 ? 1 : -1);
+      }
+    }
+
+    updatePosition() {
+      this.element.style.transform = `translate(${this.x}px, ${this.y}px)`; 
+    }
+
+    cambiarEstado() {
+      this.estado++;
+      if (this.estado >= estados.length) {
+        this.estado = 0;
+      }
+      this.element.textContent = estados[this.estado];
+      this.setVelocidad();
+    }
+
+    mover() {
+      if (this.vx === 0 && this.vy === 0) return;
+
+      this.x += this.vx;
+      this.y += this.vy;
+
+      if (this.x < 0) { this.x = 0; this.vx = -this.vx; }
+      if (this.y < 0) { this.y = 0; this.vy = -this.vy; }
+      if (this.x + this.width > window.innerWidth) { this.x = window.innerWidth - this.width; this.vx = -this.vx; }
+      if (this.y + this.height > window.innerHeight) { this.y = window.innerHeight - this.height; this.vy = -this.vy; }
+
+      this.updatePosition();
+    }
+  }
+
+  const emojis = [];
+
+  function crearEmojiRandom(esInicial = false) {
+    const x = Math.random() * (window.innerWidth - 80);
+    const y = Math.random() * (window.innerHeight - 80);
+    const e = new Emoji(x, y, esInicial);
+    emojis.push(e);
+  }
+
+  crearEmojiRandom(true);
+
+  function mostrarFinYReiniciar(texto) {
+    mensajeFin.textContent = texto;
+    mensajeFin.style.display = 'block';
+    setTimeout(() => {
+      location.reload();
+    }, 3000);
+  }
+
+  function verificarFinal() {
+    if (juegoTerminado) return;
+
+    const huevos = emojis.filter(e => e.estado === 0);
+    const gallinas = emojis.filter(e => e.estado === 3);
+
+    if (gallinas.length > 10 && huevos.length === 0) {
+      juegoTerminado = true;
+      mostrarFinYReiniciar("Fin del juego - Final malo");
+    } 
+    else if (huevos.length >= 100 && gallinas.length === 1) {
+      juegoTerminado = true;
+
+      // Convertir todos los huevos en gallinas antes de mostrar mensaje
+      huevos.forEach(huevo => {
+        huevo.estado = 3;
+        huevo.element.textContent = estados[3];
+        huevo.setVelocidad();
+      });
+
+      // Actualizar contador
+      contadorGallinas += huevos.length;
+      contadorEl.textContent = String(contadorGallinas).padStart(3, '0');
+
+      // Mostrar mensaje y reiniciar después
+      mostrarFinYReiniciar("Fin del juego - Final bueno");
+    }
+  }
+
+  function animar() {
+    emojis.forEach(e => e.mover());
+    verificarFinal();
+    requestAnimationFrame(animar);
+  }
+  animar();
+
+  window.addEventListener('resize', () => {
+    emojis.forEach(e => {
+      e.x = Math.min(e.x, window.innerWidth - e.width);
+      e.y = Math.min(e.y, window.innerHeight - e.height);
+    });
+  });
+</script>
+
+</body>
+</html>
+
